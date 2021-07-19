@@ -1,0 +1,44 @@
+branch-selector() {
+	declare -A hashoptions
+	git pull
+	local start=1
+	local CURRENT=$(git rev-parse --abbrev-ref HEAD)
+	local NOTMAIN=$(git branch -a | grep -v $CURRENT | wc -l)
+	local OTHER=$(git branch -a | grep -v $CURRENT )
+	local ONLYBRANCH=''
+	for last in $(git branch -a | grep -v "$CURRENT" ); do
+		if [[ "${last##*/}" == "->" ]] || [[ "${last##*/}" = "HEAD" ]]; then
+			continue
+		fi  
+		ONLYBRANCH+=( "${last##*/}\n " ) 
+	done
+	for branch in $(echo "$ONLYBRANCH" | xargs -n1 | sort | xargs); do
+		if  grep  -q -e "$branch" <<< ${(@v)hashoptions}; then
+			continue
+		else
+			hashoptions+=( ["${start}"]=$branch )
+			start=$(($start+1))
+		fi
+	done
+	if [ ${#hashoptions[@]} -gt 1 ]; then
+		for key val in "${(@kv)hashoptions}"; do 
+			echo "$key - $val"
+		done | sort -n -k1
+		echo -n "Above are all of the branches.  Select the number that is correlated with a branch. "
+		read answer
+		if ! [ "$answer" -eq "$answer" ] 2>/dev/null; then 
+			answer=0
+		fi
+		while [ $answer -gt ${#hashoptions[@]} ] || [ $answer -le 0 ]; do
+				echo -n "That is not a selection.  Please select a value from above. "
+				read answer
+				if ! [ "$answer" -eq "$answer" ] 2>/dev/null; then 
+					answer=0
+				fi
+		done
+		git checkout "${hashoptions[$answer]}"
+	else
+		git checkout ${OTHER##*/}
+	fi
+	unset hashoptions
+}
